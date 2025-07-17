@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
+    "deploy-mah.priv.at": "vite build --mode development --outDir ./dist.webtest --base=/apps/pmtiles-dem-lookup/  && rsync -avz --delete ./dist.webtest/ mah@mah.priv.at:/var/www/static.mah.priv.at/apps/pmtiles-dem-lookup/ && echo  https://static.mah.priv.at/apps/pmtiles-dem-lookup/ && qrcode-terminal https://static.mah.priv.at/apps/pmtiles-dem-lookup/",
     "test:e2e": "cypress run",
     "test:unit": "vitest",
     "test:dem": "tsx test/test-harness.ts",
