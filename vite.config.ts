@@ -14,7 +14,16 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      buffer: 'buffer',
+      process: 'process/browser'
     },
+  },
+  define: {
+    global: 'globalThis',
+    'process.env': {}
+  },
+  optimizeDeps: {
+    include: ['buffer', 'process']
   },
   test: {
     globals: true,

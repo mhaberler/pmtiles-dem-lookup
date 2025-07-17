@@ -37,3 +37,15 @@ add a test location called 'Stiwoll Kehrer' at 47.12871160312656, 15.21091465840
 ---
 
 now add webp decompression and test with the webp compressed  pmtiles dem
+
+------
+
+now lets turn to the vue demo
+
+use the existing tab src/views/Tab1Page.vue for para protomaps-leaflet meter input  (which of the two dems should be used) and app output as per below
+below that add a leaflet map based on  protomaps-leaflet 
+when you click on the map, show the elevation and related debug text in a region in the above text window
+also display number of cached tiles
+add a method to draw a bounding box and precache those dem tiles
+
+

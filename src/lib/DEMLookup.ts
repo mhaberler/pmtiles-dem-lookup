@@ -1,6 +1,6 @@
 import { PMTiles, Compression, TileType } from 'pmtiles';
-import { PNG } from 'pngjs';
-import * as sharp from 'sharp';
+import { BrowserPNGDecoder } from './BrowserPNGDecoder';
+import { BrowserWebPDecoder } from './BrowserWebPDecoder';
 
 export interface ElevationResult {
   elevation: number;
@@ -66,6 +66,10 @@ export class DEMLookup {
       if (this.debug) {
         console.log('PMTiles initialized:', this.info);
         console.log('Metadata:', metadata);
+        
+        // Check WebP support for better debugging
+        const webpSupported = await BrowserWebPDecoder.checkWebPSupport();
+        console.log('WebP support:', webpSupported ? 'Yes' : 'No');
       }
     } catch (error) {
       console.error('Failed to initialize PMTiles:', error);
@@ -260,23 +264,27 @@ export class DEMLookup {
         if (this.debug) {
           console.log('Decoding PNG tile');
         }
-        const png = PNG.sync.read(Buffer.from(tileData));
+        
+        // Always use browser-native decoder for maximum compatibility
+        const browserDecoder = new BrowserPNGDecoder();
+        const browserResult = await browserDecoder.decodePNG(tileData.buffer.slice(0) as ArrayBuffer);
         imageData = {
-          data: png.data,
-          width: png.width,
-          height: png.height
+          data: browserResult.data,
+          width: browserResult.width,
+          height: browserResult.height
         };
       } else if (isWebP) {
         if (this.debug) {
           console.log('Decoding WebP tile');
         }
-        // Use Sharp to decode WebP
-        const sharpImage = sharp.default(Buffer.from(tileData));
-        const { data, info } = await sharpImage.raw().toBuffer({ resolveWithObject: true });
+        
+        // Use browser-native WebP decoder
+        const browserWebPDecoder = new BrowserWebPDecoder();
+        const browserResult = await browserWebPDecoder.decodeWebP(tileData.buffer.slice(0) as ArrayBuffer);
         imageData = {
-          data: data,
-          width: info.width,
-          height: info.height
+          data: browserResult.data,
+          width: browserResult.width,
+          height: browserResult.height
         };
       } else {
         throw new Error('Unsupported image format - not PNG or WebP');
