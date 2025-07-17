@@ -29,3 +29,6 @@ the vue demo app shall have:
 -----
 
 it seems this is still simulated elevation - is the decompression working?
+
+----
+add a test location called 'Stiwoll Kehrer' at 47.12871160312656, 15.210914658403269 , expected altitude around 860m

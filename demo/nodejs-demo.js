@@ -39,7 +39,8 @@ async function main() {
       { name: 'Hallstatt (lake village)', lat: 47.5622, lon: 13.6492, expected: '~500m (lake level)' },
       { name: 'Grossglockner', lat: 47.0739, lon: 12.6769, expected: '~3798m (highest peak)' },
       { name: 'Salzburg', lat: 47.8095, lon: 13.0550, expected: '~400m (city)' },
-      { name: 'Innsbruck', lat: 47.2692, lon: 11.4041, expected: '~600m (alpine valley)' }
+      { name: 'Innsbruck', lat: 47.2692, lon: 11.4041, expected: '~600m (alpine valley)' },
+      { name: 'Stiwoll Kehrer', lat: 47.12871160312656, lon: 15.210914658403269, expected: '~860m (hill)' }
     ];
 
     console.log('🗻 Elevation Lookups:');

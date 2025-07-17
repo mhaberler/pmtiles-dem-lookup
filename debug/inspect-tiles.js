@@ -16,14 +16,14 @@ async function inspectTileData() {
 
   await demLookup.initialize();
 
-  // Get Vienna tile
-  const vienna = { lat: 48.2082, lon: 16.3738 };
+  // Get Stiwoll Kehrer tile (expected ~860m elevation)
+  const stiwoll = { lat: 47.12871160312656, lon: 15.210914658403269 };
   const info = demLookup.getInfo();
   const zoom = info.maxZoom;
   
   // Calculate tile coordinates
-  const tileCoords = demLookup.latLonToTile(vienna.lat, vienna.lon, zoom);
-  console.log(`Vienna tile coordinates: ${tileCoords.x}/${tileCoords.y}/${zoom}`);
+  const tileCoords = demLookup.latLonToTile(stiwoll.lat, stiwoll.lon, zoom);
+  console.log(`Stiwoll Kehrer tile coordinates: ${tileCoords.x}/${tileCoords.y}/${zoom}`);
 
   // Get the tile data directly
   const tileData = await demLookup.getTile(tileCoords.x, tileCoords.y, zoom);
@@ -42,11 +42,18 @@ async function inspectTileData() {
   console.log(`- Is WebP: ${isWebP}`);
   
   // Save tile for inspection
-  const filename = `tile-${tileCoords.x}-${tileCoords.y}-${zoom}.${isPNG ? 'png' : isWebP ? 'webp' : 'bin'}`;
+  const filename = `tile-stiwoll-${tileCoords.x}-${tileCoords.y}-${zoom}.${isPNG ? 'png' : isWebP ? 'webp' : 'bin'}`;
   fs.writeFileSync(filename, tileData);
   console.log(`- Saved as: ${filename}`);
+
+  // Test elevation lookup
+  console.log(`\n🏔️  Testing elevation at Stiwoll Kehrer:`);
+  const elevation = await demLookup.getElevation(stiwoll.lat, stiwoll.lon);
+  console.log(`- Coordinates: ${stiwoll.lat}, ${stiwoll.lon}`);
+  console.log(`- Elevation: ${elevation.elevation.toFixed(1)}m (expected ~860m)`);
+  console.log(`- Resolution: ${elevation.metersPerPixel.toFixed(1)}m/pixel`);
   
-  return { tileData, isPNG, isWebP, filename };
+  return { tileData, isPNG, isWebP, filename, elevation };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

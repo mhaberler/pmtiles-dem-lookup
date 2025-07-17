@@ -19,7 +19,8 @@ async function testDEMLookup(): Promise<void> {
   const testCoords: TestCoordinate[] = [
     { lat: 48.2082, lon: 16.3738, name: 'Vienna, Austria' },
     { lat: 47.2692, lon: 11.4041, name: 'Innsbruck, Austria' },
-    { lat: 47.8095, lon: 13.0550, name: 'Salzburg, Austria' }
+    { lat: 47.8095, lon: 13.0550, name: 'Salzburg, Austria' },
+    { lat: 47.12871160312656, lon: 15.210914658403269, name: 'Stiwoll Kehrer, Austria' }
   ];
 
   for (const url of testUrls) {
@@ -143,7 +144,8 @@ async function interactiveTest(): Promise<void> {
     { lat: 47.0739, lon: 12.6769, name: 'Grossglockner (highest peak in Austria)' },
     { lat: 47.2692, lon: 11.4041, name: 'Innsbruck (Alpine valley)' },
     { lat: 48.2082, lon: 16.3738, name: 'Vienna (lowlands)' },
-    { lat: 47.5595, lon: 14.2654, name: 'Bad Ischl (lake district)' }
+    { lat: 47.5595, lon: 14.2654, name: 'Bad Ischl (lake district)' },
+    { lat: 47.12871160312656, lon: 15.210914658403269, name: 'Stiwoll Kehrer (hill)' }
   ];
   
   for (const location of locations) {
