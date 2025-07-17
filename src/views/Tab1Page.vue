@@ -290,18 +290,30 @@ const updateCacheStats = () => {
 };
 
 const lookupElevation = async (lat: number, lon: number) => {
-  if (!demLookup.value) return;
+  console.log('lookupElevation called with:', lat, lon);
+  console.log('demLookup.value:', demLookup.value);
+  
+  if (!demLookup.value) {
+    console.log('demLookup not initialized');
+    addDebugLog('Error: DEM not initialized');
+    return;
+  }
   
   try {
+    addDebugLog(`Starting elevation lookup at ${lat.toFixed(6)}, ${lon.toFixed(6)}`);
     const startTime = Date.now();
     const result = await demLookup.value.getElevation(lat, lon);
     const queryTime = Date.now() - startTime;
+    
+    console.log('Elevation result:', result);
     
     lastElevation.value = {
       coordinates: { lat, lon },
       elevation: result.elevation,
       queryTime
     };
+    
+    console.log('lastElevation.value after assignment:', lastElevation.value);
     
     updateCacheStats();
     addDebugLog(`Elevation lookup: ${lat.toFixed(6)}, ${lon.toFixed(6)} -> ${result.elevation.toFixed(1)}m (${queryTime}ms)`);
@@ -370,9 +382,14 @@ const initializeMap = () => {
   
   // Add click handler for elevation lookup
   map.value.on('click', (e: L.LeafletMouseEvent) => {
+    console.log('Map clicked at:', e.latlng.lat, e.latlng.lng);
+    addDebugLog(`Map clicked: ${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`);
+    
     if (boundingBoxMode.value) {
+      console.log('Handling bounding box click');
       handleBoundingBoxClick(e);
     } else {
+      console.log('Performing elevation lookup');
       lookupElevation(e.latlng.lat, e.latlng.lng);
     }
   });

@@ -49,3 +49,32 @@ also display number of cached tiles
 add a method to draw a bounding box and precache those dem tiles
 
 
+-----
+
+    map zoom and scroll is fine
+    click - which should cause a dem lookup - does not work
+
+
+the lookup works fine
+console log:
+
+DEMLookup initialized with URL: https://static.mah.priv.at/cors/AT-10m-png.pmtiles
+DEMLookup.ts:67 PMTiles initialized: Proxy(Object)
+DEMLookup.ts:68 Metadata: Object
+DEMLookup.ts:72 WebP support: Yes
+Tab1Page.vue:383 Map clicked at: 47.44542672818543 13.672485351562502
+Tab1Page.vue:390 Performing elevation lookup
+Tab1Page.vue:293 lookupElevation called with: 47.44542672818543 13.672485351562502
+Tab1Page.vue:294 demLookup.value: Proxy(DEMLookup)
+DEMLookup.ts:99 Getting elevation for lat: 47.44542672818543, lon: 13.672485351562502, zoom: 13, tile: 4407/2866/13
+DEMLookup.ts:190 Cache miss for tile: 13/4407/2866, fetching...
+DEMLookup.ts:254 Extracting elevation at pixel (32, 106) from tile data (90594 bytes)
+DEMLookup.ts:265 Decoding PNG tile
+DEMLookup.ts:294 Image decoded: 256x256, 262144 bytes
+DEMLookup.ts:322 RGB values: (1, 219, 143) -> elevation: 2174.3m
+Tab1Page.vue:308 Elevation result: Object
+
+the resulting value is just not displayed in the text part of the window - add that
+
+
+its all there, just scroll...
