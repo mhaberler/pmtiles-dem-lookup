@@ -1,5 +1,6 @@
 import { PMTiles } from 'pmtiles';
 import { PNG } from 'pngjs';
+import * as sharp from 'sharp';
 export class DEMLookup {
     constructor(url, options) {
         this.cache = {};
@@ -183,26 +184,56 @@ export class DEMLookup {
             if (this.debug) {
                 console.log(`Extracting elevation at pixel (${pixelX}, ${pixelY}) from tile data (${tileData.length} bytes)`);
             }
-            // Decode PNG image
-            const png = PNG.sync.read(Buffer.from(tileData));
+            // Detect image format and decode accordingly
+            const isPNG = this.isPNGFormat(tileData);
+            const isWebP = this.isWebPFormat(tileData);
+            let imageData;
+            if (isPNG) {
+                if (this.debug) {
+                    console.log('Decoding PNG tile');
+                }
+                const png = PNG.sync.read(Buffer.from(tileData));
+                imageData = {
+                    data: png.data,
+                    width: png.width,
+                    height: png.height
+                };
+            }
+            else if (isWebP) {
+                if (this.debug) {
+                    console.log('Decoding WebP tile');
+                }
+                // Use Sharp to decode WebP
+                const sharpImage = sharp.default(Buffer.from(tileData));
+                const { data, info } = await sharpImage.raw().toBuffer({ resolveWithObject: true });
+                imageData = {
+                    data: data,
+                    width: info.width,
+                    height: info.height
+                };
+            }
+            else {
+                throw new Error('Unsupported image format - not PNG or WebP');
+            }
             if (this.debug) {
-                console.log(`PNG decoded: ${png.width}x${png.height}, ${png.data.length} bytes`);
+                console.log(`Image decoded: ${imageData.width}x${imageData.height}, ${imageData.data.length} bytes`);
             }
             // Ensure pixel coordinates are within bounds
-            const x = Math.max(0, Math.min(pixelX, png.width - 1));
-            const y = Math.max(0, Math.min(pixelY, png.height - 1));
-            // Calculate pixel index (PNG data is RGBA format, 4 bytes per pixel)
-            const pixelIndex = (y * png.width + x) * 4;
-            if (pixelIndex + 2 >= png.data.length) {
+            const x = Math.max(0, Math.min(pixelX, imageData.width - 1));
+            const y = Math.max(0, Math.min(pixelY, imageData.height - 1));
+            // Calculate pixel index (assuming RGBA format, 4 bytes per pixel for PNG, 3 for RGB)
+            const channels = imageData.data.length / (imageData.width * imageData.height);
+            const pixelIndex = (y * imageData.width + x) * channels;
+            if (pixelIndex + 2 >= imageData.data.length) {
                 if (this.debug) {
                     console.log('Pixel out of bounds, returning 0 elevation');
                 }
                 return 0;
             }
-            // Extract RGB values (ignore alpha channel)
-            const r = png.data[pixelIndex];
-            const g = png.data[pixelIndex + 1];
-            const b = png.data[pixelIndex + 2];
+            // Extract RGB values (ignore alpha channel if present)
+            const r = imageData.data[pixelIndex];
+            const g = imageData.data[pixelIndex + 1];
+            const b = imageData.data[pixelIndex + 2];
             // Decode elevation using Mapbox RGB encoding
             // elevation = -10000 + ((R * 256 * 256 + G * 256 + B) * 0.1)
             const elevation = -10000 + ((r * 256 * 256 + g * 256 + b) * 0.1);
@@ -213,7 +244,7 @@ export class DEMLookup {
         }
         catch (error) {
             console.error('Error extracting elevation from tile:', error);
-            // Fallback to simulated data if PNG decoding fails
+            // Fallback to simulated data if image decoding fails
             if (this.debug) {
                 console.log('Falling back to simulated elevation');
             }
@@ -247,5 +278,21 @@ export class DEMLookup {
         // Each zoom level halves the meters per pixel
         const baseMetersPerPixel = 156543.03392804097;
         return baseMetersPerPixel / Math.pow(2, zoom);
+    }
+    /**
+     * Check if data is PNG format
+     */
+    isPNGFormat(data) {
+        const pngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        return pngSignature.every((byte, i) => data[i] === byte);
+    }
+    /**
+     * Check if data is WebP format
+     */
+    isWebPFormat(data) {
+        // WebP signature: "RIFF" at start and "WEBP" at offset 8
+        return data.length >= 12 &&
+            data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46 && // "RIFF"
+            data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50; // "WEBP"
     }
 }

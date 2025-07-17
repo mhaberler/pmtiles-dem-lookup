@@ -12,11 +12,13 @@
     "test:dem": "tsx test/test-harness.ts",
     "test:dem:interactive": "tsx test/test-harness.ts --interactive",
     "test:dem:performance": "tsx test/test-harness.ts --performance",
+    "test:webp": "node test/webp-test.js",
     "demo:nodejs": "node demo/nodejs-demo.js",
     "build:lib": "tsc src/lib/DEMLookup.ts --outDir dist --target es2020 --module es2020 --moduleResolution node",
     "lint": "eslint ."
   },
   "dependencies": {
+    "@canvas/image-data": "^1.0.0",
     "@capacitor/app": "7.0.1",
     "@capacitor/core": "7.4.2",
     "@capacitor/haptics": "7.0.1",

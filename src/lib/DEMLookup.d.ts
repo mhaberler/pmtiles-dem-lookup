@@ -91,4 +91,12 @@ export declare class DEMLookup {
      * Calculate meters per pixel at a given zoom level
      */
     private calculateMetersPerPixel;
+    /**
+     * Check if data is PNG format
+     */
+    private isPNGFormat;
+    /**
+     * Check if data is WebP format
+     */
+    private isWebPFormat;
 }
