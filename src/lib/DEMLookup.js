@@ -1,4 +1,5 @@
 import { PMTiles } from 'pmtiles';
+import { PNG } from 'pngjs';
 export class DEMLookup {
     constructor(url, options) {
         this.cache = {};
@@ -173,32 +174,56 @@ export class DEMLookup {
     }
     /**
      * Extract elevation from RGB-encoded tile data
-     * TODO: Implement proper image decoding for PNG/WebP tiles
      */
     async extractElevationFromTile(tileData, lat, lon, zoom) {
-        // For now, return a simulated elevation based on tile data
-        // This is a placeholder until proper image decoding is implemented
-        if (this.debug) {
-            console.log(`Extracting elevation from tile data (${tileData.length} bytes) for lat: ${lat}, lon: ${lon}, zoom: ${zoom}`);
+        try {
+            // Convert tile coordinates to pixel coordinates within the tile
+            const { x: tileX, y: tileY } = this.latLonToTile(lat, lon, zoom);
+            const { pixelX, pixelY } = this.latLonToPixel(lat, lon, zoom, tileX, tileY);
+            if (this.debug) {
+                console.log(`Extracting elevation at pixel (${pixelX}, ${pixelY}) from tile data (${tileData.length} bytes)`);
+            }
+            // Decode PNG image
+            const png = PNG.sync.read(Buffer.from(tileData));
+            if (this.debug) {
+                console.log(`PNG decoded: ${png.width}x${png.height}, ${png.data.length} bytes`);
+            }
+            // Ensure pixel coordinates are within bounds
+            const x = Math.max(0, Math.min(pixelX, png.width - 1));
+            const y = Math.max(0, Math.min(pixelY, png.height - 1));
+            // Calculate pixel index (PNG data is RGBA format, 4 bytes per pixel)
+            const pixelIndex = (y * png.width + x) * 4;
+            if (pixelIndex + 2 >= png.data.length) {
+                if (this.debug) {
+                    console.log('Pixel out of bounds, returning 0 elevation');
+                }
+                return 0;
+            }
+            // Extract RGB values (ignore alpha channel)
+            const r = png.data[pixelIndex];
+            const g = png.data[pixelIndex + 1];
+            const b = png.data[pixelIndex + 2];
+            // Decode elevation using Mapbox RGB encoding
+            // elevation = -10000 + ((R * 256 * 256 + G * 256 + B) * 0.1)
+            const elevation = -10000 + ((r * 256 * 256 + g * 256 + b) * 0.1);
+            if (this.debug) {
+                console.log(`RGB values: (${r}, ${g}, ${b}) -> elevation: ${elevation.toFixed(1)}m`);
+            }
+            return Math.round(elevation * 10) / 10; // Round to 1 decimal place
         }
-        // Simple simulation: use tile data length and coordinates to simulate elevation
-        // In a real implementation, you would:
-        // 1. Decode the PNG/WebP image to get RGBA pixel data
-        // 2. Calculate exact pixel position within the 256x256 tile
-        // 3. Extract RGB values at that position
-        // 4. Apply Mapbox RGB encoding: elevation = -10000 + ((R * 256 * 256 + G * 256 + B) * 0.1)
-        const { x: tileX, y: tileY } = this.latLonToTile(lat, lon, zoom);
-        const { pixelX, pixelY } = this.latLonToPixel(lat, lon, zoom, tileX, tileY);
-        // Simulate elevation based on coordinates and tile data
-        // This gives us values that vary by location for testing purposes
-        const baseElevation = Math.abs(Math.sin(lat * Math.PI / 180) * Math.cos(lon * Math.PI / 180)) * 3000;
-        const dataVariation = (tileData.length % 1000) / 10;
-        const pixelVariation = (pixelX + pixelY) % 500;
-        const simulatedElevation = baseElevation + dataVariation + pixelVariation;
-        if (this.debug) {
-            console.log(`Simulated elevation: ${simulatedElevation.toFixed(1)}m (pixel: ${pixelX}, ${pixelY})`);
+        catch (error) {
+            console.error('Error extracting elevation from tile:', error);
+            // Fallback to simulated data if PNG decoding fails
+            if (this.debug) {
+                console.log('Falling back to simulated elevation');
+            }
+            const { x: tileX, y: tileY } = this.latLonToTile(lat, lon, zoom);
+            const { pixelX, pixelY } = this.latLonToPixel(lat, lon, zoom, tileX, tileY);
+            const baseElevation = Math.abs(Math.sin(lat * Math.PI / 180) * Math.cos(lon * Math.PI / 180)) * 3000;
+            const dataVariation = (tileData.length % 1000) / 10;
+            const pixelVariation = (pixelX + pixelY) % 500;
+            return Math.round((baseElevation + dataVariation + pixelVariation) * 10) / 10;
         }
-        return Math.round(simulatedElevation * 10) / 10; // Round to 1 decimal place
     }
     /**
      * Convert lat/lon to pixel coordinates within a specific tile

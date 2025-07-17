@@ -25,3 +25,7 @@ the vue demo app shall have:
 - a leaflet window below, defaulting to track the current position - use  protomaps-leaflet for this
 - moving the cursor over the map should cause a lookup to happen
 
+
+-----
+
+it seems this is still simulated elevation - is the decompression working?

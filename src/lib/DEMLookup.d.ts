@@ -67,7 +67,7 @@ export declare class DEMLookup {
     /**
      * Get a tile from cache or fetch it
      */
-    private getTile;
+    getTile(x: number, y: number, z: number): Promise<Uint8Array>;
     /**
      * Add tile to cache with LRU eviction
      */
@@ -75,10 +75,12 @@ export declare class DEMLookup {
     /**
      * Convert latitude/longitude to tile coordinates
      */
-    private latLonToTile;
+    latLonToTile(lat: number, lon: number, zoom: number): {
+        x: number;
+        y: number;
+    };
     /**
      * Extract elevation from RGB-encoded tile data
-     * TODO: Implement proper image decoding for PNG/WebP tiles
      */
     private extractElevationFromTile;
     /**
