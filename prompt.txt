@@ -82,12 +82,15 @@ its all there, just scroll...
 
 ----
 
-tile size in km per edge
-
+also report the tile size in km per edge
 show number of tiles cached
 show progress on tile prefetch
 
-switch to cursor tracking
-enlarge font, pack text region
-allow entry of arbitrary urls
-show bbox of dem
+switch to cursor tracking and lookup on cursor move
+enlarge font in the output region, better pack text region
+allow entry of arbitrary urls, not just the two dems
+show bbox of dem when it is selected
+
+----
+
+in the cursor popup, just report the elevation - dem coverage is irrelevant there

@@ -32,8 +32,21 @@
                 <ion-select-option value="https://static.mah.priv.at/cors/AT-10m-webp.pmtiles">
                   Austria 10m (WebP)
                 </ion-select-option>
+                <ion-select-option value="custom">
+                  Custom URL
+                </ion-select-option>
               </ion-select>
               <ion-label slot="start">DEM Source:</ion-label>
+            </ion-item>
+
+            <ion-item v-if="selectedDemUrl === 'custom'">
+              <ion-input 
+                v-model="customDemUrl" 
+                type="url" 
+                placeholder="Enter PMTiles URL"
+                @ionInput="updateCustomUrl"
+              ></ion-input>
+              <ion-label slot="start">Custom URL:</ion-label>
             </ion-item>
 
             <ion-item>
@@ -50,6 +63,11 @@
             <ion-item>
               <ion-checkbox v-model="debugMode" @ionChange="toggleDebug"></ion-checkbox>
               <ion-label slot="start">Debug Mode</ion-label>
+            </ion-item>
+
+            <ion-item>
+              <ion-checkbox v-model="mouseTrackingMode" @ionChange="toggleMouseTracking"></ion-checkbox>
+              <ion-label slot="start">Mouse Tracking (instead of click)</ion-label>
             </ion-item>
 
             <div class="action-buttons">
@@ -89,7 +107,7 @@
             <ion-card-title>Status & Results</ion-card-title>
           </ion-card-header>
           <ion-card-content>
-            <div class="status-grid">
+            <div class="status-grid large-font">
               <div class="status-item">
                 <strong>Status:</strong> 
                 <span :class="statusClass">{{ status }}</span>
@@ -105,10 +123,23 @@
                 <strong>Resolution:</strong> 
                 {{ demInfo.metersPerPixel.toFixed(1) }}m/pixel (zoom {{ demInfo.maxZoom }})
               </div>
+
+              <div class="status-item" v-if="demInfo">
+                <strong>Tile Size:</strong> 
+                {{ tileSizeKm.toFixed(1) }}km per edge
+              </div>
               
               <div class="status-item" v-if="cacheStats">
                 <strong>Cache:</strong> 
                 {{ cacheStats.size }}/{{ cacheStats.maxSize }} tiles
+              </div>
+
+              <div class="status-item" v-if="precacheProgress && precacheProgress.total > 0">
+                <strong>Pre-cache Progress:</strong> 
+                {{ precacheProgress.completed }}/{{ precacheProgress.total }} ({{ precacheProgress.percentage }}%)
+                <div v-if="precacheProgress.currentTile" class="small-text">
+                  Current: {{ precacheProgress.currentTile }}
+                </div>
               </div>
               
               <div class="status-item" v-if="lastElevation">
@@ -124,6 +155,11 @@
               <div class="status-item" v-if="lastElevation">
                 <strong>Query Time:</strong> 
                 {{ lastElevation.queryTime }}ms
+              </div>
+
+              <div class="status-item" v-if="currentMousePosition && mouseTrackingMode">
+                <strong>Mouse Position:</strong>
+                {{ currentMousePosition.lat.toFixed(6) }}, {{ currentMousePosition.lng.toFixed(6) }}
               </div>
             </div>
 
@@ -154,6 +190,14 @@
             <ion-label>Click and drag to draw a bounding box for pre-caching</ion-label>
           </ion-chip>
         </div>
+        <!-- Cursor tooltip for elevation -->
+        <div 
+          v-if="mouseTrackingMode && cursorElevation" 
+          class="cursor-tooltip"
+          :style="{ left: cursorTooltipPosition.x + 'px', top: cursorTooltipPosition.y + 'px' }"
+        >
+          {{ cursorElevation.toFixed(1) }}m
+        </div>
       </div>
     </ion-content>
   </ion-page>
@@ -174,8 +218,10 @@ import 'leaflet/dist/leaflet.css';
 
 // Reactive state
 const selectedDemUrl = ref('https://static.mah.priv.at/cors/AT-10m-png.pmtiles');
+const customDemUrl = ref('');
 const cacheSize = ref(100);
 const debugMode = ref(false);
+const mouseTrackingMode = ref(false);
 const isLoading = ref(false);
 const status = ref('Not initialized');
 const boundingBoxMode = ref(false);
@@ -190,6 +236,17 @@ const lastElevation = ref<{
   elevation: number;
   queryTime: number;
 } | null>(null);
+
+// New state for enhancements
+const precacheProgress = ref<{
+  completed: number;
+  total: number;
+  percentage: number;
+  currentTile?: string;
+} | null>(null);
+const currentMousePosition = ref<L.LatLng | null>(null);
+const cursorElevation = ref<number | null>(null);
+const cursorTooltipPosition = ref({ x: 0, y: 0 });
 
 // Debug output
 const debugOutput = ref<{ time: string; message: string }[]>([]);
@@ -208,6 +265,11 @@ const statusClass = computed(() => {
   }
 });
 
+const tileSizeKm = computed(() => {
+  if (!demLookup.value || !demInfo.value) return 0;
+  return demLookup.value.getTileSizeKm(demInfo.value.maxZoom);
+});
+
 // Methods
 const addDebugLog = (message: string) => {
   if (debugMode.value) {
@@ -220,15 +282,16 @@ const addDebugLog = (message: string) => {
 };
 
 const initializeDem = async () => {
-  if (!selectedDemUrl.value) return;
+  const urlToUse = selectedDemUrl.value === 'custom' ? customDemUrl.value : selectedDemUrl.value;
+  if (!urlToUse) return;
   
   isLoading.value = true;
   status.value = 'Loading...';
   
   try {
-    addDebugLog(`Initializing DEM: ${selectedDemUrl.value}`);
+    addDebugLog(`Initializing DEM: ${urlToUse}`);
     
-    demLookup.value = new DEMLookup(selectedDemUrl.value, {
+    demLookup.value = new DEMLookup(urlToUse, {
       maxCacheSize: cacheSize.value,
       debug: debugMode.value
     });
@@ -241,11 +304,24 @@ const initializeDem = async () => {
     
     addDebugLog(`DEM initialized: ${demInfo.value?.metersPerPixel.toFixed(1)}m/pixel`);
     
-    // Center map on Austria if not already positioned
+    // Show DEM bounding box on map
     if (map.value && demInfo.value) {
       const bounds = demInfo.value.bounds;
       const center = [(bounds[1] + bounds[3]) / 2, (bounds[0] + bounds[2]) / 2] as [number, number];
       map.value.setView(center, 8);
+      
+      // Add bounding box overlay to show DEM coverage
+      const demBounds = L.latLngBounds(
+        [bounds[1], bounds[0]], // southwest
+        [bounds[3], bounds[2]]  // northeast
+      );
+      
+      L.rectangle(demBounds, {
+        color: '#ff7800',
+        weight: 2,
+        opacity: 0.8,
+        fillOpacity: 0.1
+      }).addTo(map.value as any).bindPopup(`DEM Coverage: ${bounds[0].toFixed(2)}°, ${bounds[1].toFixed(2)}° to ${bounds[2].toFixed(2)}°, ${bounds[3].toFixed(2)}°`);
     }
     
   } catch (error) {
@@ -263,6 +339,12 @@ const switchDem = () => {
   }
 };
 
+const updateCustomUrl = () => {
+  if (selectedDemUrl.value === 'custom' && customDemUrl.value) {
+    addDebugLog(`Custom URL updated: ${customDemUrl.value}`);
+  }
+};
+
 const updateCacheSize = () => {
   // Cache size will be applied on next initialization
   addDebugLog(`Cache size updated to: ${cacheSize.value}`);
@@ -272,6 +354,16 @@ const toggleDebug = () => {
   if (demLookup.value) {
     // Debug mode change will require re-initialization
     addDebugLog(`Debug mode ${debugMode.value ? 'enabled' : 'disabled'}`);
+  }
+};
+
+const toggleMouseTracking = () => {
+  addDebugLog(`Mouse tracking ${mouseTrackingMode.value ? 'enabled' : 'disabled'}`);
+  if (mouseTrackingMode.value) {
+    addDebugLog('Move mouse over map to see elevation data');
+  } else {
+    // Clear cursor elevation when disabling mouse tracking
+    cursorElevation.value = null;
   }
 };
 
@@ -324,6 +416,21 @@ const lookupElevation = async (lat: number, lon: number) => {
   }
 };
 
+// Separate function for cursor elevation lookup (lightweight, no logging)
+const lookupCursorElevation = async (lat: number, lon: number) => {
+  if (!demLookup.value) {
+    cursorElevation.value = null;
+    return;
+  }
+  
+  try {
+    const result = await demLookup.value.getElevation(lat, lon);
+    cursorElevation.value = result.elevation;
+  } catch (error) {
+    cursorElevation.value = null;
+  }
+};
+
 const toggleBoundingBoxMode = () => {
   boundingBoxMode.value = !boundingBoxMode.value;
   
@@ -349,17 +456,23 @@ const precacheBoundingBox = async (bounds: L.LatLngBounds) => {
   try {
     addDebugLog(`Pre-caching bounding box: ${Object.values(boundingBoxDef).map(v => v.toFixed(4)).join(', ')}`);
     status.value = 'Pre-caching...';
+    precacheProgress.value = { completed: 0, total: 1, percentage: 0 };
     
-    await demLookup.value.precacheBoundingBox(boundingBoxDef);
+    await demLookup.value.precacheBoundingBox(boundingBoxDef, (progress) => {
+      precacheProgress.value = progress;
+      addDebugLog(`Pre-cache progress: ${progress.completed}/${progress.total} (${progress.percentage}%)`);
+    });
+    
     updateCacheStats();
-    
     status.value = 'Ready';
+    precacheProgress.value = null;
     addDebugLog(`Pre-caching completed. Cache: ${cacheStats.value?.size} tiles`);
     
   } catch (error) {
     console.error('Pre-caching failed:', error);
     addDebugLog(`Pre-caching error: ${error}`);
     status.value = 'Ready';
+    precacheProgress.value = null;
   }
 };
 
@@ -388,16 +501,38 @@ const initializeMap = () => {
     if (boundingBoxMode.value) {
       console.log('Handling bounding box click');
       handleBoundingBoxClick(e);
-    } else {
+    } else if (!mouseTrackingMode.value) {
       console.log('Performing elevation lookup');
       lookupElevation(e.latlng.lat, e.latlng.lng);
     }
   });
   
-  // Add mouse move handler for bounding box
+  // Add mouse move handler for mouse tracking and bounding box
+  let mouseTrackingTimeout: NodeJS.Timeout | null = null;
   map.value.on('mousemove', (e: L.LeafletMouseEvent) => {
+    currentMousePosition.value = e.latlng;
+    
+    // Update cursor tooltip position for mouse tracking
+    if (mouseTrackingMode.value) {
+      const mapContainer = document.getElementById('map');
+      if (mapContainer) {
+        cursorTooltipPosition.value = {
+          x: e.containerPoint.x + 10, // Offset to avoid cursor overlap
+          y: e.containerPoint.y - 30
+        };
+      }
+    }
+    
     if (boundingBoxMode.value && boundingBoxStart) {
       updateBoundingBox(e.latlng);
+    } else if (mouseTrackingMode.value && demLookup.value) {
+      // Throttle mouse tracking elevation lookups
+      if (mouseTrackingTimeout) {
+        clearTimeout(mouseTrackingTimeout);
+      }
+      mouseTrackingTimeout = setTimeout(() => {
+        lookupCursorElevation(e.latlng.lat, e.latlng.lng);
+      }, 150); // 150ms throttle
     }
   });
   
@@ -472,6 +607,28 @@ onUnmounted(() => {
   padding: 4px 0;
 }
 
+.status-grid.large-font {
+  font-size: 16px;
+  line-height: 1.4;
+  gap: 12px;
+}
+
+.status-grid.large-font .status-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.status-grid.large-font .status-item:last-child {
+  border-bottom: none;
+}
+
+.small-text {
+  font-size: 14px;
+  color: #666;
+  font-style: italic;
+  margin-top: 4px;
+}
+
 .status-ready {
   color: #2dd36f;
   font-weight: bold;
@@ -540,6 +697,20 @@ onUnmounted(() => {
   top: 10px;
   left: 10px;
   z-index: 1000;
+}
+
+.cursor-tooltip {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 1001;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Responsive design */

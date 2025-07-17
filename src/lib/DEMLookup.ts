@@ -28,6 +28,13 @@ export interface TileCache {
   [key: string]: Uint8Array;
 }
 
+export interface PrecacheProgress {
+  completed: number;
+  total: number;
+  percentage: number;
+  currentTile?: string;
+}
+
 export class DEMLookup {
   private pmtiles: PMTiles;
   private cache: TileCache = {};
@@ -125,7 +132,10 @@ export class DEMLookup {
   /**
    * Pre-cache tiles within a bounding box
    */
-  async precacheBoundingBox(boundingBox: BoundingBox): Promise<void> {
+  async precacheBoundingBox(
+    boundingBox: BoundingBox, 
+    progressCallback?: (progress: PrecacheProgress) => void
+  ): Promise<void> {
     if (!this.info) {
       throw new Error('DEMLookup not initialized. Call initialize() first.');
     }
@@ -134,19 +144,39 @@ export class DEMLookup {
     const nwTile = this.latLonToTile(boundingBox.north, boundingBox.west, zoom);
     const seTile = this.latLonToTile(boundingBox.south, boundingBox.east, zoom);
 
+    const totalTiles = (seTile.x - nwTile.x + 1) * (seTile.y - nwTile.y + 1);
+    let completedTiles = 0;
+
     if (this.debug) {
-      console.log(`Pre-caching bounding box at zoom ${zoom}: from ${nwTile.x}/${nwTile.y} to ${seTile.x}/${seTile.y}`);
+      console.log(`Pre-caching bounding box at zoom ${zoom}: from ${nwTile.x}/${nwTile.y} to ${seTile.x}/${seTile.y} (${totalTiles} tiles)`);
     }
 
-    const promises: Promise<void>[] = [];
-    
     for (let x = nwTile.x; x <= seTile.x; x++) {
       for (let y = nwTile.y; y <= seTile.y; y++) {
-        promises.push(this.precacheTile(x, y, zoom));
+        const tileKey = `${zoom}/${x}/${y}`;
+        
+        if (progressCallback) {
+          progressCallback({
+            completed: completedTiles,
+            total: totalTiles,
+            percentage: Math.round((completedTiles / totalTiles) * 100),
+            currentTile: tileKey
+          });
+        }
+
+        await this.precacheTile(x, y, zoom);
+        completedTiles++;
       }
     }
 
-    await Promise.all(promises);
+    // Final progress update
+    if (progressCallback) {
+      progressCallback({
+        completed: totalTiles,
+        total: totalTiles,
+        percentage: 100
+      });
+    }
   }
 
   /**
@@ -369,6 +399,17 @@ export class DEMLookup {
     // Each zoom level halves the meters per pixel
     const baseMetersPerPixel = 156543.03392804097;
     return baseMetersPerPixel / Math.pow(2, zoom);
+  }
+
+  /**
+   * Calculate tile size in kilometers at a given zoom level
+   * Assumes 256x256 pixel tiles
+   */
+  public getTileSizeKm(zoom: number): number {
+    const metersPerPixel = this.calculateMetersPerPixel(zoom);
+    const tileSizePixels = 256;
+    const tileSizeMeters = metersPerPixel * tileSizePixels;
+    return tileSizeMeters / 1000; // Convert to kilometers
   }
 
   /**
