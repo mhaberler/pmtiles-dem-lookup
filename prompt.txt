@@ -78,3 +78,16 @@ the resulting value is just not displayed in the text part of the window - add t
 
 
 its all there, just scroll...
+
+
+----
+
+tile size in km per edge
+
+show number of tiles cached
+show progress on tile prefetch
+
+switch to cursor tracking
+enlarge font, pack text region
+allow entry of arbitrary urls
+show bbox of dem
